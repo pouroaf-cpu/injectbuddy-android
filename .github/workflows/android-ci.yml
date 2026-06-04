@@ -38,8 +38,22 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Assemble debug + run unit tests
-        run: gradle :app:assembleDebug :app:testDebugUnitTest --no-daemon --stacktrace
+      - name: Assemble debug
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+
+      # recordPaparazziDebug runs ALL unit tests (calc/projection) AND renders the
+      # Compose snapshots to PNG. Paparazzi isn't configuration-cache friendly, so disable
+      # it for this invocation only.
+      - name: Run unit tests + render screenshots (Paparazzi)
+        run: gradle :app:recordPaparazziDebug --no-daemon --stacktrace --no-configuration-cache
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: app/src/test/snapshots/
+          if-no-files-found: warn
 
       - name: Upload test reports
         if: always()

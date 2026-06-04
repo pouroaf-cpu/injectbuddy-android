@@ -3,8 +3,8 @@ package com.injectbuddy.android.data.repo
 import com.injectbuddy.android.domain.AuthRepository
 import com.injectbuddy.android.domain.AuthState
 import io.github.jan.supabase.SupabaseClient
-import io.github.jan.supabase.auth.SessionStatus
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.auth.providers.Discord
 import io.github.jan.supabase.auth.providers.builtin.Email
 import kotlinx.coroutines.CoroutineScope

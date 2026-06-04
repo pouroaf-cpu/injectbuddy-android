@@ -41,8 +41,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.injectbuddy.android.calc.CYCLE_PLOTTER_SLUG
 import com.injectbuddy.android.calc.CalculatorResult
+import com.injectbuddy.android.calc.CalculatorSpec
 import com.injectbuddy.android.calc.Field
 import com.injectbuddy.android.calc.FieldType
+import com.injectbuddy.android.calc.ResultLine
+import com.injectbuddy.android.calc.specFor
 import com.injectbuddy.android.ui.components.ErrorState
 
 /**
@@ -89,6 +92,34 @@ fun CalculatorScreen(slug: String, onBack: () -> Unit) {
     val result by vm.result.collectAsStateWithLifecycle()
     val saveStatus by vm.saveStatus.collectAsStateWithLifecycle()
 
+    CalculatorContent(
+        spec = spec,
+        inputs = inputs,
+        result = result,
+        saveStatus = saveStatus,
+        onInput = vm::onFieldChange,
+        onSave = { vm.save(label = null) },
+        onBack = onBack,
+    )
+}
+
+/**
+ * Stateless body of [CalculatorScreen]: the whole screen UI (Scaffold + TopAppBar + the
+ * spec-driven inputs LazyColumn + pinned result/save card) rendered purely from its
+ * parameters. Holds no ViewModel/ServiceLocator/network state, so it can be driven by sample
+ * data in a Paparazzi snapshot or a preview.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun CalculatorContent(
+    spec: CalculatorSpec,
+    inputs: Map<String, String>,
+    result: CalculatorResult,
+    saveStatus: SaveStatus,
+    onInput: (key: String, value: String) -> Unit,
+    onSave: () -> Unit,
+    onBack: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -105,7 +136,7 @@ fun CalculatorScreen(slug: String, onBack: () -> Unit) {
                 result = result,
                 saveStatus = saveStatus,
                 savable = spec.savable,
-                onSave = { vm.save(label = null) },
+                onSave = onSave,
             )
         },
     ) { padding ->
@@ -121,7 +152,7 @@ fun CalculatorScreen(slug: String, onBack: () -> Unit) {
                 CalcField(
                     field = field,
                     value = inputs[field.key].orEmpty(),
-                    onChange = { vm.onFieldChange(field.key, it) },
+                    onChange = { onInput(field.key, it) },
                 )
             }
         }
@@ -272,3 +303,62 @@ private fun formatPrimary(result: CalculatorResult): String {
     }
     return if (result.primaryUnit.isEmpty()) value else "$value ${result.primaryUnit}"
 }
+
+// ── Sample data for snapshots / previews ──────────────────────────────────────
+// Stateless realistic states so CalculatorContent can be rendered headlessly without a
+// ViewModel, ServiceLocator, or engine call. Values mirror a real computed result.
+
+/** Realistic TRT state: 200 mg/mL vial, 100 mg/wk, E3.5D → 0.25 mL / 25 U per injection. */
+internal fun sampleTrtState(): CalculatorSampleState {
+    val spec = specFor("trt-dose")!!
+    val inputs = mapOf(
+        "esterType" to "Testosterone Enanthate",
+        "mode" to "ndays",
+        "strength" to "200",
+        "mgWeek" to "100",
+        "nDays" to "3.5",
+        "injPerWeek" to "",
+        "mlDrawn" to "",
+    )
+    val result = CalculatorResult(
+        primaryValue = 0.25,
+        primaryUnit = "mL",
+        secondary = listOf(
+            ResultLine("Units (U-100)", "25", "U"),
+            ResultLine("Dose per injection", "50", "mg"),
+            ResultLine("Schedule", "every 3.5 days"),
+            ResultLine("Injections per week", "2"),
+        ),
+    )
+    return CalculatorSampleState(spec, inputs, result)
+}
+
+/** Realistic reconstitution-style peptide state (dropdowns + number fields, with a result). */
+internal fun samplePeptideState(): CalculatorSampleState {
+    val spec = specFor("peptide")!!
+    val inputs = mapOf(
+        "peptideType" to "BPC-157",
+        "peptideMg" to "5",
+        "bawMl" to "2",
+        "dosePerInj" to "250",
+        "doseUnit" to "mcg",
+        "injPerWeek" to "7",
+    )
+    val result = CalculatorResult(
+        primaryValue = 0.1,
+        primaryUnit = "mL",
+        secondary = listOf(
+            ResultLine("Units (U-100)", "10", "U"),
+            ResultLine("Concentration", "2500", "mcg/mL"),
+            ResultLine("Doses per vial", "20"),
+        ),
+    )
+    return CalculatorSampleState(spec, inputs, result)
+}
+
+/** Bundle of the three params [CalculatorContent] needs, so one factory feeds a snapshot. */
+internal data class CalculatorSampleState(
+    val spec: CalculatorSpec,
+    val inputs: Map<String, String>,
+    val result: CalculatorResult,
+)

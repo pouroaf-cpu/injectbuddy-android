@@ -45,7 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
 /** One compound row in the plotter: name, weekly dose, and its active span (start/duration). */
-private data class PlotterCompound(
+internal data class PlotterCompound(
     val id: Int,
     val name: String = "",
     val weeklyDose: String = "",
@@ -61,7 +61,6 @@ private data class PlotterCompound(
  *
  * Deliberately self-contained (no ViewModel / persistence) — it's a visual planning surface.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CyclePlotterScreen(onBack: () -> Unit) {
     val compounds = remember {
@@ -69,7 +68,35 @@ fun CyclePlotterScreen(onBack: () -> Unit) {
     }
     var nextId by remember { mutableStateOf(2) }
 
+    CyclePlotterContent(
+        compounds = compounds,
+        onAddCompound = {
+            compounds.add(PlotterCompound(id = nextId))
+            nextId += 1
+        },
+        onChangeCompound = { index, updated -> compounds[index] = updated },
+        onRemoveCompound = { index -> compounds.removeAt(index) },
+        onBack = onBack,
+    )
+}
+
+/**
+ * Stateless body of [CyclePlotterScreen]: the whole timeline editor (Scaffold + compound
+ * editors + Gantt week strip) rendered purely from the supplied [compounds] list and edit
+ * lambdas. Holds no remembered state of its own, so a snapshot can drive it with sample
+ * compounds across weeks.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun CyclePlotterContent(
+    compounds: List<PlotterCompound>,
+    onAddCompound: () -> Unit,
+    onChangeCompound: (index: Int, updated: PlotterCompound) -> Unit,
+    onRemoveCompound: (index: Int) -> Unit,
+    onBack: () -> Unit,
+) {
     // Timeline length = furthest (startWeek + duration) across all compounds, min 12.
+    // Key on contents (toList) so edits to a SnapshotStateList's items still recompute this.
     val totalWeeks = remember(compounds.toList()) {
         val end = compounds.maxOfOrNull { c ->
             (c.startWeek.toIntOrNull() ?: 1) + (c.durationWeeks.toIntOrNull() ?: 0) - 1
@@ -116,19 +143,16 @@ fun CyclePlotterScreen(onBack: () -> Unit) {
                 CompoundEditor(
                     compound = compound,
                     accent = palette[index % palette.size],
-                    onChange = { updated -> compounds[index] = updated },
+                    onChange = { updated -> onChangeCompound(index, updated) },
                     onRemove = if (compounds.size > 1) {
-                        { compounds.removeAt(index) }
+                        { onRemoveCompound(index) }
                     } else null,
                 )
             }
 
             item {
                 FilledTonalButton(
-                    onClick = {
-                        compounds.add(PlotterCompound(id = nextId))
-                        nextId += 1
-                    },
+                    onClick = onAddCompound,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Filled.Add, contentDescription = null)
@@ -274,6 +298,13 @@ private fun TimelineGantt(
         }
     }
 }
+
+/** Sample compounds across overlapping weeks so the plotter content snapshots a realistic cycle. */
+internal fun samplePlotterCompounds(): List<PlotterCompound> = listOf(
+    PlotterCompound(id = 1, name = "Test E", weeklyDose = "250", startWeek = "1", durationWeeks = "12"),
+    PlotterCompound(id = 2, name = "Deca", weeklyDose = "200", startWeek = "1", durationWeeks = "10"),
+    PlotterCompound(id = 3, name = "Anavar", weeklyDose = "350", startWeek = "9", durationWeeks = "6"),
+)
 
 // Small local helpers to avoid importing itemsIndexed/items extension ambiguity in LazyColumn vs LazyRow.
 private inline fun <T> androidx.compose.foundation.lazy.LazyListScope.itemsIndexedCompat(

@@ -69,6 +69,40 @@ fun SettingsScreen(openDrawer: () -> Unit) {
     val prefs by vm.prefs.collectAsStateWithLifecycle()
     val theme by vm.themeMode.collectAsStateWithLifecycle()
 
+    SettingsContent(
+        profile = profile,
+        theme = theme,
+        units = prefs.units,
+        syringe = prefs.syringe,
+        onTheme = vm::setTheme,
+        onUnits = vm::setUnits,
+        onSyringe = vm::setSyringe,
+        onLinkDiscord = vm::linkDiscord,
+        onSignOut = vm::signOut,
+        onDeleteAccount = vm::deleteAccount,
+        openDrawer = openDrawer,
+    )
+}
+
+/**
+ * Stateless settings UI — full Scaffold + TopAppBar + list + delete dialog, fed the loaded
+ * profile/preferences and lambdas. Pure (no VM / ServiceLocator) so it renders headlessly
+ * under Paparazzi. The delete-confirmation dialog's own visibility is local UI state.
+ */
+@Composable
+internal fun SettingsContent(
+    profile: UiState<UserProfile>,
+    theme: ThemeMode,
+    units: UnitSystem,
+    syringe: SyringeScale,
+    onTheme: (ThemeMode) -> Unit,
+    onUnits: (UnitSystem) -> Unit,
+    onSyringe: (SyringeScale) -> Unit,
+    onLinkDiscord: () -> Unit,
+    onSignOut: () -> Unit,
+    onDeleteAccount: () -> Unit,
+    openDrawer: () -> Unit,
+) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -87,13 +121,13 @@ fun SettingsScreen(openDrawer: () -> Unit) {
             padding = padding,
             profile = profile,
             theme = theme,
-            units = prefs.units,
-            syringe = prefs.syringe,
-            onTheme = vm::setTheme,
-            onUnits = vm::setUnits,
-            onSyringe = vm::setSyringe,
-            onLinkDiscord = vm::linkDiscord,
-            onSignOut = vm::signOut,
+            units = units,
+            syringe = syringe,
+            onTheme = onTheme,
+            onUnits = onUnits,
+            onSyringe = onSyringe,
+            onLinkDiscord = onLinkDiscord,
+            onSignOut = onSignOut,
             onDelete = { showDeleteDialog = true },
         )
     }
@@ -106,7 +140,7 @@ fun SettingsScreen(openDrawer: () -> Unit) {
             confirmButton = {
                 TextButton(onClick = {
                     showDeleteDialog = false
-                    vm.deleteAccount()
+                    onDeleteAccount()
                 }) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
@@ -322,3 +356,14 @@ private fun SyringeScale.label() = when (this) {
     SyringeScale.U100 -> "U-100"
     SyringeScale.U40 -> "U-40"
 }
+
+// ── sample state (for Paparazzi snapshots) ─────────────────────────────────────────
+
+/** A loaded profile for snapshot rendering of the settings screen. */
+internal fun sampleSettingsProfile(): UiState<UserProfile> =
+    UiState.Content(
+        UserProfile(id = "u1", displayName = "Pouroa Frew", email = "you@example.com"),
+    )
+
+/** The default preference selections (Metric units, U-100 syringe) for snapshots. */
+internal fun sampleSettingsPrefs(): SettingsPrefs = SettingsPrefs()

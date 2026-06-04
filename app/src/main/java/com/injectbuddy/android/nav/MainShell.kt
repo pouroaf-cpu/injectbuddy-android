@@ -9,12 +9,18 @@ import androidx.compose.material3.PermanentDrawerSheet
 import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.injectbuddy.android.data.model.UserProfile
+import com.injectbuddy.android.di.ServiceLocator
 import kotlinx.coroutines.launch
 
 /**
@@ -28,6 +34,13 @@ fun MainShell() {
     val scope = rememberCoroutineScope()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+
+    // Profile for the drawer header — loaded once here and passed down so DrawerContent
+    // stays stateless (and snapshot-renderable).
+    var profile by remember { mutableStateOf<UserProfile?>(null) }
+    LaunchedEffect(Unit) {
+        ServiceLocator.accountRepository.getProfile().onSuccess { profile = it }
+    }
 
     fun navigateTo(route: String) {
         navController.navigate(route) {
@@ -44,7 +57,7 @@ fun MainShell() {
             PermanentNavigationDrawer(
                 drawerContent = {
                     PermanentDrawerSheet {
-                        DrawerContent(currentRoute = currentRoute, onNavigate = ::navigateTo)
+                        DrawerContent(currentRoute = currentRoute, profile = profile, onNavigate = ::navigateTo)
                     }
                 },
             ) {
@@ -58,6 +71,7 @@ fun MainShell() {
                     ModalDrawerSheet {
                         DrawerContent(
                             currentRoute = currentRoute,
+                            profile = profile,
                             onNavigate = { route ->
                                 scope.launch { drawerState.close() }
                                 navigateTo(route)

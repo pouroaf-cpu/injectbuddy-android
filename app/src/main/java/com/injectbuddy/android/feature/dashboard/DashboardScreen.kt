@@ -46,12 +46,15 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.injectbuddy.android.core.UiState
+import com.injectbuddy.android.data.model.UserProfile
 import com.injectbuddy.android.di.ServiceLocator
 import com.injectbuddy.android.feature.calendar.DerivedProtocol
+import com.injectbuddy.android.feature.calendar.ProjectedDose
 import com.injectbuddy.android.ui.components.EmptyState
 import com.injectbuddy.android.ui.components.ErrorState
 import com.injectbuddy.android.ui.components.LoadingState
 import com.injectbuddy.android.ui.theme.ThemeMode
+import java.time.LocalDate
 
 /**
  * Dashboard / cycle-planner — the NavHost start destination (SCREENS.md §1). Owns its own
@@ -72,6 +75,29 @@ fun DashboardScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val themeMode by ServiceLocator.themeController.mode.collectAsStateWithLifecycle()
 
+    DashboardContent(
+        state = state,
+        themeMode = themeMode,
+        openDrawer = openDrawer,
+        onOpenCalculator = onOpenCalculator,
+        onRetry = vm::load,
+        onToggleTheme = { ServiceLocator.themeController.set(themeMode.next()) },
+    )
+}
+
+/**
+ * Stateless dashboard UI — the full Scaffold + TopAppBar + body, fed [state] and lambdas.
+ * Pure (no VM / ServiceLocator) so it renders headlessly under Paparazzi.
+ */
+@Composable
+internal fun DashboardContent(
+    state: UiState<DashboardData>,
+    themeMode: ThemeMode,
+    openDrawer: () -> Unit,
+    onOpenCalculator: (String) -> Unit,
+    onRetry: () -> Unit,
+    onToggleTheme: () -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -82,7 +108,7 @@ fun DashboardScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { ServiceLocator.themeController.set(themeMode.next()) }) {
+                    IconButton(onClick = onToggleTheme) {
                         val icon = if (themeMode == ThemeMode.DARK) Icons.Filled.LightMode else Icons.Filled.DarkMode
                         Icon(icon, contentDescription = "Toggle theme")
                     }
@@ -92,7 +118,7 @@ fun DashboardScreen(
     ) { padding ->
         when (val s = state) {
             is UiState.Loading -> LoadingState(Modifier.padding(padding))
-            is UiState.Error -> ErrorState(s.message, onRetry = vm::load, modifier = Modifier.padding(padding))
+            is UiState.Error -> ErrorState(s.message, onRetry = onRetry, modifier = Modifier.padding(padding))
             is UiState.Empty -> EmptyState(
                 title = "No protocols yet",
                 message = "Add your first protocol to see your dose schedule and weekly totals.",
@@ -100,7 +126,7 @@ fun DashboardScreen(
                 onAction = { onOpenCalculator("trt-dose") },
                 modifier = Modifier.padding(padding),
             )
-            is UiState.Content -> DashboardContent(
+            is UiState.Content -> DashboardBody(
                 data = s.data,
                 contentPadding = padding,
                 onOpenCalculator = onOpenCalculator,
@@ -110,7 +136,7 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun DashboardContent(
+private fun DashboardBody(
     data: DashboardData,
     contentPadding: PaddingValues,
     onOpenCalculator: (String) -> Unit,
@@ -311,4 +337,82 @@ private fun calculatorSlug(calculatorType: String): String = when (calculatorTyp
     "bpc157blend", "blend" -> "bpc-157-tb500"
     "freetest" -> "free-t-index"
     else -> calculatorType
+}
+
+// ── sample states (for Paparazzi snapshots) ────────────────────────────────────────
+
+/**
+ * A fully-populated dashboard: greeting, a next-dose card, a Mon→Sun week strip with dose
+ * dots, three protocol cards, and weekly totals. Deterministic dates (no clock reads).
+ */
+internal fun sampleDashboardData(): DashboardData {
+    val monday = LocalDate.of(2026, 6, 1) // a fixed Monday for stable snapshots
+    val today = monday.plusDays(2) // "Wednesday"
+    val protocols = listOf(
+        DerivedProtocol(
+            id = "p1",
+            label = "Testosterone",
+            calculatorType = "trt",
+            startDate = monday,
+            freqDays = 3.5,
+            doseLabel = "50.0 mg",
+        ),
+        DerivedProtocol(
+            id = "p2",
+            label = "Semaglutide",
+            calculatorType = "semaglutide",
+            startDate = monday,
+            freqDays = 7.0,
+            doseLabel = "0.5 mg",
+        ),
+        DerivedProtocol(
+            id = "p3",
+            label = "BPC-157",
+            calculatorType = "bpc157",
+            startDate = monday,
+            freqDays = 1.0,
+            doseLabel = "250.0 mcg",
+        ),
+    )
+    val weekStrip = (0 until 7).map { i ->
+        val date = monday.plusDays(i.toLong())
+        DayDoses(
+            date = date,
+            isToday = date == today,
+            doseCount = protocols.count { isDoseDayLocal(it, date) },
+        )
+    }
+    return DashboardData(
+        profile = UserProfile(id = "u1", displayName = "Pouroa Frew", email = "you@example.com"),
+        greeting = "Good morning",
+        dosages = emptyList(),
+        protocols = protocols,
+        activeCycle = null,
+        nextDose = ProjectedDose(
+            dosageId = "p1",
+            date = today,
+            label = "Testosterone",
+            calculatorType = "trt",
+            doseLabel = "50.0 mg",
+        ),
+        nextDoseCountdownDays = 0L,
+        cycleDay = 3,
+        cycleTotalDays = 84,
+        weekStrip = weekStrip,
+        weeklyTotals = listOf(
+            "2× 50.0 mg · Testosterone",
+            "1× 0.5 mg · Semaglutide",
+            "7× 250.0 mcg · BPC-157",
+        ),
+    )
+}
+
+// Local mirror of the dose-day rule so the sample stays self-contained (matches the engine).
+private fun isDoseDayLocal(p: DerivedProtocol, date: LocalDate): Boolean {
+    val d = java.time.temporal.ChronoUnit.DAYS.between(p.startDate, date)
+    if (d < 0) return false
+    val f = p.freqDays
+    if (f <= 0) return false
+    return if (f == Math.floor(f)) d % f.toLong() == 0L
+    else Math.round(Math.round(d / f) * f) == d
 }

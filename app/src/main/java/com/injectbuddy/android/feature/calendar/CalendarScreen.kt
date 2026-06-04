@@ -64,6 +64,31 @@ fun CalendarScreen(openDrawer: () -> Unit) {
     }
     val state by vm.state.collectAsStateWithLifecycle()
 
+    CalendarContent(
+        state = state,
+        openDrawer = openDrawer,
+        onRetry = vm::load,
+        onPrevMonth = vm::previousMonth,
+        onNextMonth = vm::nextMonth,
+        onToday = vm::goToToday,
+        onSelectDay = vm::selectDay,
+    )
+}
+
+/**
+ * Stateless calendar UI — full Scaffold + TopAppBar + body, fed [state] and lambdas. Pure
+ * (no VM / ServiceLocator) so it renders headlessly under Paparazzi.
+ */
+@Composable
+internal fun CalendarContent(
+    state: UiState<CalendarData>,
+    openDrawer: () -> Unit,
+    onRetry: () -> Unit,
+    onPrevMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onToday: () -> Unit,
+    onSelectDay: (LocalDate) -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -78,7 +103,7 @@ fun CalendarScreen(openDrawer: () -> Unit) {
     ) { padding ->
         when (val s = state) {
             is UiState.Loading -> LoadingState(Modifier.padding(padding))
-            is UiState.Error -> ErrorState(s.message, onRetry = vm::load, modifier = Modifier.padding(padding))
+            is UiState.Error -> ErrorState(s.message, onRetry = onRetry, modifier = Modifier.padding(padding))
             is UiState.Empty -> EmptyState(
                 title = "Nothing scheduled",
                 message = "Add a protocol to see your schedule.",
@@ -86,20 +111,20 @@ fun CalendarScreen(openDrawer: () -> Unit) {
                 onAction = openDrawer, // drawer is the route back to the dashboard / calculators
                 modifier = Modifier.padding(padding),
             )
-            is UiState.Content -> CalendarContent(
+            is UiState.Content -> CalendarBody(
                 data = s.data,
                 contentPadding = padding,
-                onPrevMonth = vm::previousMonth,
-                onNextMonth = vm::nextMonth,
-                onToday = vm::goToToday,
-                onSelectDay = vm::selectDay,
+                onPrevMonth = onPrevMonth,
+                onNextMonth = onNextMonth,
+                onToday = onToday,
+                onSelectDay = onSelectDay,
             )
         }
     }
 }
 
 @Composable
-private fun CalendarContent(
+private fun CalendarBody(
     data: CalendarData,
     contentPadding: PaddingValues,
     onPrevMonth: () -> Unit,
@@ -296,3 +321,48 @@ private val MONDAY_FIRST = listOf(
 
 private val AGENDA_FMT: java.time.format.DateTimeFormatter =
     java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault())
+
+// ── sample state (for Paparazzi snapshots) ─────────────────────────────────────────
+
+/**
+ * A populated month built off the real projection engine: a few protocols on different
+ * frequencies give several dose-dot days, with a selected day that has a multi-item
+ * agenda. Deterministic dates — no clock reads — so snapshots stay stable.
+ */
+internal fun sampleCalendarData(): CalendarData {
+    val start = LocalDate.of(2026, 6, 1) // a fixed Monday
+    val today = LocalDate.of(2026, 6, 10)
+    val protocols = listOf(
+        DerivedProtocol(
+            id = "p1",
+            label = "Testosterone",
+            calculatorType = "trt",
+            startDate = start,
+            freqDays = 3.5,
+            doseLabel = "50.0 mg",
+        ),
+        DerivedProtocol(
+            id = "p2",
+            label = "Semaglutide",
+            calculatorType = "semaglutide",
+            startDate = start,
+            freqDays = 7.0,
+            doseLabel = "0.5 mg",
+        ),
+        DerivedProtocol(
+            id = "p3",
+            label = "BPC-157",
+            calculatorType = "bpc157",
+            startDate = start,
+            freqDays = 1.0,
+            doseLabel = "250.0 mcg",
+        ),
+    )
+    val byDay = projectDoses(protocols, start, windowDays = 60).groupBy { it.date }
+    return CalendarData(
+        visibleMonth = YearMonth.of(2026, 6),
+        selectedDay = today,
+        dosesByDay = byDay,
+        today = today,
+    )
+}

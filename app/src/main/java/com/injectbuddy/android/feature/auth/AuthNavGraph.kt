@@ -82,31 +82,84 @@ private fun LoginScreen(onSignUp: () -> Unit, onForgot: () -> Unit) {
     val vm = authViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
 
+    LoginContent(
+        state = state,
+        onEmailChange = vm::onEmailChange,
+        onPasswordChange = vm::onPasswordChange,
+        onSignIn = vm::signIn,
+        onDiscord = vm::signInWithDiscord,
+        onForgot = onForgot,
+        onSignUp = onSignUp,
+    )
+}
+
+@Composable
+private fun SignUpScreen(onBackToLogin: () -> Unit) {
+    val vm = authViewModel()
+    val state by vm.state.collectAsStateWithLifecycle()
+
+    SignUpContent(
+        state = state,
+        onEmailChange = vm::onEmailChange,
+        onPasswordChange = vm::onPasswordChange,
+        onConfirmChange = vm::onConfirmChange,
+        onSignUp = vm::signUp,
+        onDiscord = vm::signInWithDiscord,
+        onBackToLogin = onBackToLogin,
+    )
+}
+
+@Composable
+private fun ResetScreen(onBackToLogin: () -> Unit) {
+    val vm = authViewModel()
+    val state by vm.state.collectAsStateWithLifecycle()
+
+    ResetContent(
+        state = state,
+        onEmailChange = vm::onEmailChange,
+        onSendReset = vm::sendReset,
+        onBackToLogin = onBackToLogin,
+    )
+}
+
+// ── stateless content (snapshot-friendly: no VM / ServiceLocator) ───────────────────
+
+/** The login form, fed UI state + no-op-able callbacks. Pure for Paparazzi snapshots. */
+@Composable
+internal fun LoginContent(
+    state: AuthFormState,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onSignIn: () -> Unit,
+    onDiscord: () -> Unit,
+    onForgot: () -> Unit,
+    onSignUp: () -> Unit,
+) {
     AuthScaffold(title = "injectbuddy", subtitle = null) {
         AuthTextField(
             value = state.email,
-            onValueChange = vm::onEmailChange,
+            onValueChange = onEmailChange,
             label = "Email",
             error = state.emailError,
             keyboardType = KeyboardType.Email,
         )
         PasswordField(
             value = state.password,
-            onValueChange = vm::onPasswordChange,
+            onValueChange = onPasswordChange,
             label = "Password",
             error = state.passwordError,
             imeAction = ImeAction.Done,
-            onImeAction = { if (state.loginValid) vm.signIn() },
+            onImeAction = { if (state.loginValid) onSignIn() },
         )
         FormError(state.error)
         PrimaryButton(
             text = "Sign in",
             enabled = state.loginValid && !state.submitting,
             loading = state.submitting,
-            onClick = vm::signIn,
+            onClick = onSignIn,
         )
         OrDivider()
-        DiscordButton(enabled = !state.submitting, onClick = vm::signInWithDiscord)
+        DiscordButton(enabled = !state.submitting, onClick = onDiscord)
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onForgot) { Text("Forgot?") }
             Text("·", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -115,51 +168,60 @@ private fun LoginScreen(onSignUp: () -> Unit, onForgot: () -> Unit) {
     }
 }
 
+/** The sign-up form, fed UI state + no-op-able callbacks. Pure for Paparazzi snapshots. */
 @Composable
-private fun SignUpScreen(onBackToLogin: () -> Unit) {
-    val vm = authViewModel()
-    val state by vm.state.collectAsStateWithLifecycle()
-
+internal fun SignUpContent(
+    state: AuthFormState,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onConfirmChange: (String) -> Unit,
+    onSignUp: () -> Unit,
+    onDiscord: () -> Unit,
+    onBackToLogin: () -> Unit,
+) {
     AuthScaffold(title = "injectbuddy", subtitle = "Create account", onBack = onBackToLogin) {
         AuthTextField(
             value = state.email,
-            onValueChange = vm::onEmailChange,
+            onValueChange = onEmailChange,
             label = "Email",
             error = state.emailError,
             keyboardType = KeyboardType.Email,
         )
         PasswordField(
             value = state.password,
-            onValueChange = vm::onPasswordChange,
+            onValueChange = onPasswordChange,
             label = "Password",
             error = state.passwordError,
         )
         PasswordField(
             value = state.confirm,
-            onValueChange = vm::onConfirmChange,
+            onValueChange = onConfirmChange,
             label = "Confirm password",
             error = state.confirmError(),
             imeAction = ImeAction.Done,
-            onImeAction = { if (state.signUpValid) vm.signUp() },
+            onImeAction = { if (state.signUpValid) onSignUp() },
         )
         FormError(state.error)
         PrimaryButton(
             text = "Sign up",
             enabled = state.signUpValid && !state.submitting,
             loading = state.submitting,
-            onClick = vm::signUp,
+            onClick = onSignUp,
         )
         OrDivider()
-        DiscordButton(enabled = !state.submitting, onClick = vm::signInWithDiscord)
+        DiscordButton(enabled = !state.submitting, onClick = onDiscord)
         TextButton(onClick = onBackToLogin) { Text("Have an account? Sign in") }
     }
 }
 
+/** The reset-password form, fed UI state + no-op-able callbacks. Pure for snapshots. */
 @Composable
-private fun ResetScreen(onBackToLogin: () -> Unit) {
-    val vm = authViewModel()
-    val state by vm.state.collectAsStateWithLifecycle()
-
+internal fun ResetContent(
+    state: AuthFormState,
+    onEmailChange: (String) -> Unit,
+    onSendReset: () -> Unit,
+    onBackToLogin: () -> Unit,
+) {
     AuthScaffold(title = "Reset password", subtitle = null, onBack = onBackToLogin) {
         if (state.resetSent) {
             Text(
@@ -170,19 +232,19 @@ private fun ResetScreen(onBackToLogin: () -> Unit) {
         } else {
             AuthTextField(
                 value = state.email,
-                onValueChange = vm::onEmailChange,
+                onValueChange = onEmailChange,
                 label = "Email",
                 error = state.emailError,
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Done,
-                onImeAction = { if (state.resetValid) vm.sendReset() },
+                onImeAction = { if (state.resetValid) onSendReset() },
             )
             FormError(state.error)
             PrimaryButton(
                 text = "Send reset",
                 enabled = state.resetValid && !state.submitting,
                 loading = state.submitting,
-                onClick = vm::sendReset,
+                onClick = onSendReset,
             )
         }
         TextButton(onClick = onBackToLogin) { Text("← Back to login") }
@@ -320,3 +382,29 @@ private fun FormError(message: String?) {
         )
     }
 }
+
+// ── sample states (for Paparazzi snapshots) ────────────────────────────────────────
+
+/** A filled-in login form (valid email + password) for snapshot rendering. */
+internal fun sampleLoginState(): AuthFormState =
+    AuthFormState(email = "you@example.com", password = "hunter2pw")
+
+/** A login form showing an inline submit error (e.g. bad credentials). */
+internal fun sampleLoginErrorState(): AuthFormState =
+    AuthFormState(
+        email = "you@example.com",
+        password = "hunter2pw",
+        error = "Invalid email or password",
+    )
+
+/** A filled-in sign-up form with matching email/password/confirm. */
+internal fun sampleSignUpState(): AuthFormState =
+    AuthFormState(
+        email = "you@example.com",
+        password = "hunter2pw",
+        confirm = "hunter2pw",
+    )
+
+/** A reset form with the email pre-filled, ready to send. */
+internal fun sampleResetState(): AuthFormState =
+    AuthFormState(email = "you@example.com")

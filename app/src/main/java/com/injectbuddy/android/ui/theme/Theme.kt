@@ -35,6 +35,7 @@ private val DarkColors = darkColorScheme(
     error = ErrorRed,
 )
 
+/** App entry point — resolves the user's theme override from the ThemeController. */
 @Composable
 fun InjectBuddyTheme(content: @Composable () -> Unit) {
     val mode by ServiceLocator.themeController.mode.collectAsStateWithLifecycle()
@@ -43,8 +44,17 @@ fun InjectBuddyTheme(content: @Composable () -> Unit) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }
+    InjectBuddyTheme(darkTheme = dark, content = content)
+}
+
+/**
+ * Explicit-mode overload — same color schemes, no ServiceLocator/lifecycle dependency.
+ * Used by Paparazzi snapshots and @Preview so they render our real theme headlessly.
+ */
+@Composable
+fun InjectBuddyTheme(darkTheme: Boolean, content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = if (dark) DarkColors else LightColors,
+        colorScheme = if (darkTheme) DarkColors else LightColors,
         typography = AppTypography,
         content = content,
     )

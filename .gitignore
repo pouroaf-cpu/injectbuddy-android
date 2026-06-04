@@ -17,3 +17,6 @@
 # ─── Privacy: internal/agent docs never ship (README.md is the only public doc) ───
 *.md
 !README.md
+
+# Local CI artifact downloads (screenshots etc.)
+_shots/

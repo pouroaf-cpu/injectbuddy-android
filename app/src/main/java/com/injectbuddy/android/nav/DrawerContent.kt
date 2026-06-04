@@ -12,7 +12,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -22,17 +21,11 @@ import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.injectbuddy.android.data.model.UserProfile
-import com.injectbuddy.android.di.ServiceLocator
 
 /**
  * Drawer sheet contents — profile header, primary items, the 14 calculators, and
@@ -42,13 +35,9 @@ import com.injectbuddy.android.di.ServiceLocator
 @Composable
 fun DrawerContent(
     currentRoute: String?,
+    profile: UserProfile?,
     onNavigate: (String) -> Unit,
 ) {
-    var profile by remember { mutableStateOf<UserProfile?>(null) }
-    LaunchedEffect(Unit) {
-        ServiceLocator.accountRepository.getProfile().onSuccess { profile = it }
-    }
-
     Column(
         Modifier
             .fillMaxSize()

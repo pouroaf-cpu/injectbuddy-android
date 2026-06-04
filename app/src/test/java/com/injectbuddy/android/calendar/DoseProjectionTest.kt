@@ -91,11 +91,13 @@ class DoseProjectionTest {
     }
 
     @Test
-    fun `fractional E3-5D interval lands only on exact dose indices`() {
-        // peptide injPerWeek = 2 → freqDays = 3.5. Dose indices: 0, 3.5, 7, 10.5, 14 …
-        // Only the integer day-offsets that an integer k*3.5 reproduces are dose days:
-        // day 0 (k0), day 7 (k2), day 14 (k4), day 21 (k6), day 28 (k8). Day 3/4 are NOT
-        // dose days (3.5 rounds to neither cleanly back to the offset).
+    fun `fractional E3-5D interval rounds each dose index to a real day`() {
+        // peptide injPerWeek = 2 → freqDays = 3.5. The web's isDoseDay rounds each dose
+        // index back to a whole day: a day at offset d is a dose day iff round(round(d/f)*f)
+        // == d. For f = 3.5 that yields offsets 0, 4 (3.5→4), 7, 11 (10.5→11), 14 … — the
+        // half-day doses land on a real calendar day rather than vanishing. Offset 3 is NOT
+        // a dose day (its nearest index, 3.5, rounds to 4, not 3). This mirrors the web
+        // exactly (lib/account-schedule.ts isDoseDay).
         val p = DerivedProtocol(
             id = "p",
             label = "Pep",
@@ -105,9 +107,10 @@ class DoseProjectionTest {
             doseLabel = "250 mcg",
         )
         assertTrue(isDoseDay(p, LocalDate.of(2026, 6, 1)))  // offset 0
-        assertFalse(isDoseDay(p, LocalDate.of(2026, 6, 4))) // offset 3
-        assertFalse(isDoseDay(p, LocalDate.of(2026, 6, 5))) // offset 4
+        assertFalse(isDoseDay(p, LocalDate.of(2026, 6, 4))) // offset 3 → nearest index rounds to 4
+        assertTrue(isDoseDay(p, LocalDate.of(2026, 6, 5)))  // offset 4 (3.5 rounds here)
         assertTrue(isDoseDay(p, LocalDate.of(2026, 6, 8)))  // offset 7
+        assertTrue(isDoseDay(p, LocalDate.of(2026, 6, 12))) // offset 11 (10.5 rounds here)
         assertTrue(isDoseDay(p, LocalDate.of(2026, 6, 15))) // offset 14
     }
 

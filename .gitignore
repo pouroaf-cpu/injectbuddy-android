@@ -1,0 +1,19 @@
+# ─── Android / Gradle build outputs ───────────────────────────────
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+/app/build/
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+
+# ─── Privacy: internal/agent docs never ship (README.md is the only public doc) ───
+*.md
+!README.md

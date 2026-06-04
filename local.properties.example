@@ -1,0 +1,10 @@
+# Copy this file to `local.properties` and fill in real values.
+# `local.properties` is gitignored — never commit real keys.
+
+# Android SDK location (Android Studio fills this in automatically).
+# sdk.dir=C\:\\Users\\YOU\\AppData\\Local\\Android\\Sdk
+
+# Supabase project (same project as the InjectBuddy web app).
+# The anon key is a public client key, but keep it out of git regardless.
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY

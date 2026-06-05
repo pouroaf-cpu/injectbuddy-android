@@ -20,3 +20,6 @@
 
 # Local CI artifact downloads (screenshots etc.)
 _shots/
+
+# Claude Code personal/local settings (gitignored)
+.claude/settings.local.json
